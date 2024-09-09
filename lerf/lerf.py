@@ -64,6 +64,7 @@ class LERFModel(NerfactoModel):
         n_phrases = len(self.image_encoder.positives)
         n_phrases_maxs = [None for _ in range(n_phrases)]
         n_phrases_sims = [None for _ in range(n_phrases)]
+        clip_output_scale = []
         for i, scale in enumerate(scales_list):
             scale = scale.item()
             with torch.no_grad():
@@ -73,6 +74,7 @@ class LERFModel(NerfactoModel):
                     torch.full(scales_shape, scale, device=weights.device, dtype=hashgrid_field.dtype),
                 )
             clip_output = self.renderer_clip(embeds=clip_output, weights=weights.detach())
+            clip_output_scale.append(clip_output.detach().cpu())
 
             for j in range(n_phrases):
                 if preset_scales is None or j == i:
@@ -81,7 +83,7 @@ class LERFModel(NerfactoModel):
                     if n_phrases_maxs[j] is None or pos_prob.max() > n_phrases_sims[j].max():
                         n_phrases_maxs[j] = scale
                         n_phrases_sims[j] = pos_prob
-        return torch.stack(n_phrases_sims), torch.Tensor(n_phrases_maxs)
+        return torch.stack(n_phrases_sims), torch.Tensor(n_phrases_maxs), torch.stack(clip_output_scale, dim=1)
 
     def get_outputs(self, ray_bundle: RayBundle):
         if self.training:
@@ -129,13 +131,14 @@ class LERFModel(NerfactoModel):
 
         if not self.training:
             with torch.no_grad():
-                max_across, best_scales = self.get_max_across(
+                max_across, best_scales, output_clip_scale = self.get_max_across(
                     lerf_samples,
                     lerf_weights,
                     lerf_field_outputs[LERFFieldHeadNames.HASHGRID],
                     clip_scales.shape,
                     preset_scales=override_scales,
                 )
+                outputs["clip"] = output_clip_scale
                 outputs["raw_relevancy"] = max_across  # N x B x 1
                 outputs["best_scales"] = best_scales.to(self.device)  # N
 
