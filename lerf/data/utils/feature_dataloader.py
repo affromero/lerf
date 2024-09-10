@@ -34,16 +34,19 @@ class FeatureDataloader(ABC):
     def load(self):
         cache_info_path = self.cache_path.with_suffix(".info")
         if not cache_info_path.exists():
-            raise FileNotFoundError
+            raise FileNotFoundError(f"Cache info not found: {cache_info_path}")
+        else:
+            print(f"Loading cache from {self.cache_path} with config {self.cfg}")
         with open(cache_info_path, "r") as f:
             cfg = json.loads(f.read())
         if cfg != self.cfg:
-            raise ValueError("Config mismatch")
+            raise ValueError(f"Config mismatch: {cfg=} != {self.cfg=}")
         self.data = torch.from_numpy(np.load(self.cache_path)).to(self.device)
 
     def save(self):
         os.makedirs(self.cache_path.parent, exist_ok=True)
         cache_info_path = self.cache_path.with_suffix(".info")
+        print(f"Saving cache to {self.cache_path} with config {self.cfg}")
         with open(cache_info_path, "w") as f:
             f.write(json.dumps(self.cfg))
         np.save(self.cache_path, self.data)
@@ -51,6 +54,8 @@ class FeatureDataloader(ABC):
     def try_load(self, img_list: torch.Tensor):
         try:
             self.load()
-        except (FileNotFoundError, ValueError):
+        except (FileNotFoundError, ValueError) as e:
+            s_str = str(e)
+            print(f"Failed to load cache: {s_str}")
             self.create(img_list)
             self.save()
