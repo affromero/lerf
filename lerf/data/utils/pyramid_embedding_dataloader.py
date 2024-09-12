@@ -48,7 +48,7 @@ class PyramidEmbeddingDataloader(FeatureDataloader):
 
         # check if cache exists
         if not cache_info_path.exists():
-            raise FileNotFoundError
+            raise FileNotFoundError(f"Cache info not found: {cache_info_path}")
 
         # if config is different, remove all cached content
         with open(cache_info_path, "r") as f:
@@ -56,7 +56,7 @@ class PyramidEmbeddingDataloader(FeatureDataloader):
         if cfg != self.cfg:
             for f in os.listdir(self.cache_path):
                 os.remove(os.path.join(self.cache_path, f))
-            raise ValueError("Config mismatch")
+            raise ValueError(f"Config mismatch in {cache_info_path}: {cfg=} != {self.cfg=}")
 
         raise FileNotFoundError  # trigger create
 
